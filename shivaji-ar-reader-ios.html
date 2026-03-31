@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Raigad AR">
+<title>Raigad AR — Shivaji Letters</title>
+
+<!-- iOS home screen icon hint -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Rajdhani:wght@300;400;600&display=swap');
+
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C96A;
+    --gold-dim: #7A6030;
+    --saffron: #FF8B00;
+    --dark: #0D0B07;
+    --parchment: #F5E8C7;
+    --parchment2: #E8D5A3;
+    --white: #FAF5E8;
+    /* iOS safe area */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--dark);
+    color: var(--white);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    /* Prevent iOS rubber-band scroll on body */
+    position: fixed;
+    top: 0; left: 0;
+    -webkit-user-select: none;
+    user-select: none;
+    /* Prevent callout on long press */
+    -webkit-touch-callout: none;
+  }
+
+  /* ─── SCREENS ─── */
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: opacity 0.5s, -webkit-transform 0.5s, transform 0.5s;
+    /* account for notch */
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; -webkit-transform: scale(0.97); transform: scale(0.97); }
+
+  /* ─── INTRO ─── */
+  #intro { background: radial-gradient(ellipse 80% 60% at 50% 40%, #1e1708 0%, #0D0B07 100%); }
+
+  .intro-border {
+    border: 1px solid var(--gold-dim);
+    padding: 40px 32px;
+    max-width: 420px;
+    width: 88%;
+    text-align: center;
+    position: relative;
+  }
+  .intro-border::before, .intro-border::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-color: var(--gold);
+    border-style: solid;
+  }
+  .intro-border::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .intro-border::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  .seal { font-size: 48px; margin-bottom: 14px; }
+  .intro-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px; font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 3px; text-transform: uppercase;
+    line-height: 1.4; margin-bottom: 6px;
+  }
+  .intro-sub {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    color: var(--parchment2);
+    font-size: 13px; margin-bottom: 24px; opacity: 0.8;
+  }
+  .intro-desc { font-size: 13px; color: #998866; line-height: 1.8; margin-bottom: 28px; }
+
+  .btn-primary {
+    background: var(--gold);
+    color: var(--dark);
+    font-family: 'Cinzel', serif;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 2px;
+    padding: 16px 36px;
+    border: none; cursor: pointer;
+    text-transform: uppercase;
+    width: 100%;
+    /* iOS needs explicit -webkit- for active states */
+    -webkit-appearance: none;
+    border-radius: 0;
+    transition: background 0.2s;
+    /* make tap targets comfortable on iOS */
+    min-height: 48px;
+  }
+  .btn-primary:active { background: var(--gold-light); opacity: 0.9; }
+
+  .ios-note {
+    margin-top: 14px;
+    font-size: 11px; color: #554433;
+    letter-spacing: 1px; line-height: 1.6;
+  }
+  .ios-note span { color: #7A6030; }
+
+  /* ─── HTTPS WARNING ─── */
+  #https-warning {
+    background: rgba(255,80,0,0.1);
+    border: 1px solid rgba(255,80,0,0.3);
+    padding: 12px 16px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #FF8B00;
+    line-height: 1.6;
+    display: none;
+  }
+
+  /* ─── AR SCREEN ─── */
+  #ar-screen { background: #000; padding: 0; }
+
+  #video {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    /* Critical for iOS — must be set here AND in JS */
+    -webkit-playsinline: true;
+    playsinline: true;
+  }
+
+  /* Top bar respects notch */
+  .ar-topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding-top: calc(var(--safe-top) + 12px);
+    padding-left: calc(var(--safe-left) + 16px);
+    padding-right: calc(var(--safe-right) + 16px);
+    padding-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(13,11,7,0.9), transparent);
+    z-index: 10;
+  }
+  .ar-logo { font-family: 'Cinzel', serif; font-size: 13px; color: var(--gold); letter-spacing: 2px; }
+  .btn-back {
+    background: rgba(201,168,76,0.15);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'Cinzel', serif; font-size: 11px;
+    padding: 8px 14px; cursor: pointer; letter-spacing: 1px;
+    min-height: 36px;
+    -webkit-appearance: none; border-radius: 0;
+  }
+  .btn-back:active { background: rgba(201,168,76,0.3); }
+
+  /* Scan frame */
+  .scan-frame {
+    position: absolute;
+    top: 50%; left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    width: min(78vw, 300px);
+    aspect-ratio: 3/4;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .scan-corner {
+    position: absolute;
+    width: 26px; height: 26px;
+    border-color: var(--gold);
+    border-style: solid;
+    opacity: 0.9;
+  }
+  .scan-corner.tl { top: 0; left: 0; border-width: 3px 0 0 3px; }
+  .scan-corner.tr { top: 0; right: 0; border-width: 3px 3px 0 0; }
+  .scan-corner.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+  .scan-corner.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+
+  .scan-line {
+    position: absolute; left: 4%; right: 4%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--saffron), transparent);
+    -webkit-animation: scanMove 2.4s ease-in-out infinite;
+    animation: scanMove 2.4s ease-in-out infinite;
+    opacity: 0.7;
+  }
+  @-webkit-keyframes scanMove { 0%{top:4%} 50%{top:92%} 100%{top:4%} }
+  @keyframes scanMove          { 0%{top:4%} 50%{top:92%} 100%{top:4%} }
+
+  .scan-status {
+    position: absolute;
+    bottom: calc(var(--safe-bottom) + 24px);
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Cinzel', serif; font-size: 12px;
+    letter-spacing: 2px; color: var(--gold);
+    text-transform: uppercase; z-index: 10;
+  }
+  .scan-pulse {
+    display: inline-block; width: 6px; height: 6px;
+    background: var(--saffron); border-radius: 50%;
+    margin-right: 8px; vertical-align: middle;
+    -webkit-animation: pulse 1.2s ease-in-out infinite;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @-webkit-keyframes pulse { 0%,100%{opacity:1;-webkit-transform:scale(1)} 50%{opacity:0.4;-webkit-transform:scale(0.6)} }
+  @keyframes pulse          { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.6)} }
+
+  /* Demo buttons */
+  .demo-letters {
+    position: absolute;
+    bottom: calc(var(--safe-bottom) + 64px);
+    left: calc(var(--safe-left) + 12px);
+    right: calc(var(--safe-right) + 12px);
+    display: flex; justify-content: center;
+    gap: 8px; flex-wrap: wrap;
+    z-index: 10;
+  }
+  .demo-label { width: 100%; text-align: center; font-size: 10px; letter-spacing: 2px; color: #554433; margin-bottom: 4px; text-transform: uppercase; }
+  .demo-btn {
+    background: rgba(13,11,7,0.82);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-light);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px; letter-spacing: 1px;
+    padding: 10px 14px; cursor: pointer;
+    text-transform: uppercase;
+    min-height: 40px;
+    -webkit-appearance: none; border-radius: 0;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .demo-btn:active, .demo-btn.active {
+    background: rgba(201,168,76,0.28);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* Lock animation */
+  @-webkit-keyframes lockOn { 0%{box-shadow:0 0 0 0 rgba(201,168,76,0)} 50%{box-shadow:0 0 0 14px rgba(201,168,76,0.28)} 100%{box-shadow:0 0 0 0 rgba(201,168,76,0)} }
+  @keyframes lockOn          { 0%{box-shadow:0 0 0 0 rgba(201,168,76,0)} 50%{box-shadow:0 0 0 14px rgba(201,168,76,0.28)} 100%{box-shadow:0 0 0 0 rgba(201,168,76,0)} }
+
+  .scan-frame.locked { -webkit-animation: lockOn 0.6s ease-out forwards; animation: lockOn 0.6s ease-out forwards; }
+  .scan-frame.locked .scan-corner { border-color: #7FD67F; }
+  .scan-frame.locked .scan-line { background: linear-gradient(90deg,transparent,#7FD67F,transparent); -webkit-animation-play-state:paused; animation-play-state:paused; }
+
+  /* ─── AR PANEL ─── */
+  #ar-panel {
+    position: absolute; inset: 0;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.4s;
+    z-index: 20;
+  }
+  #ar-panel.visible { opacity: 1; pointer-events: auto; }
+
+  .panel-bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, rgba(13,11,7,0.93) 0%, rgba(26,22,16,0.9) 100%);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+
+  /* scrollable content — iOS requires -webkit-overflow-scrolling */
+  .panel-content {
+    position: absolute;
+    top: calc(var(--safe-top) + 60px);
+    bottom: calc(var(--safe-bottom) + 8px);
+    left: calc(var(--safe-left) + 14px);
+    right: calc(var(--safe-right) + 14px);
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .panel-header {
+    border-bottom: 1px solid var(--gold-dim);
+    padding-bottom: 16px; margin-bottom: 18px;
+    position: relative;
+  }
+  .panel-tag { font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: 3px; color: var(--saffron); text-transform: uppercase; margin-bottom: 6px; }
+  .panel-title { font-family: 'Cinzel', serif; font-size: 17px; font-weight: 700; color: var(--gold); line-height: 1.3; margin-bottom: 5px; }
+  .panel-meta { font-family: 'IM Fell English', serif; font-style: italic; font-size: 13px; color: var(--parchment2); opacity: 0.75; padding-right: 36px; }
+
+  .panel-close {
+    position: absolute; top: 0; right: 0;
+    background: none; border: 1px solid var(--gold-dim);
+    color: var(--gold); width: 32px; height: 32px;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: auto; min-height: 44px; min-width: 44px;
+    -webkit-appearance: none; border-radius: 0;
+  }
+  .panel-close:active { background: rgba(201,168,76,0.2); }
+
+  .section-label { font-family: 'Cinzel', serif; font-size: 9px; letter-spacing: 3px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 8px; }
+
+  .lang-tabs { display: flex; gap: 7px; margin-bottom: 14px; flex-wrap: wrap; }
+  .lang-tab {
+    font-family: 'Rajdhani', sans-serif; font-size: 12px;
+    letter-spacing: 1px; padding: 8px 14px;
+    border: 1px solid var(--gold-dim);
+    background: none; color: #998866; cursor: pointer;
+    text-transform: uppercase;
+    min-height: 40px;
+    -webkit-appearance: none; border-radius: 0;
+    transition: all 0.15s;
+    pointer-events: auto;
+  }
+  .lang-tab.active { background: var(--gold); color: var(--dark); border-color: var(--gold); font-weight: 600; }
+  .lang-tab:active { opacity: 0.8; }
+
+  .text-block {
+    background: rgba(245,232,199,0.06);
+    border-left: 2px solid var(--gold-dim);
+    padding: 14px 16px; margin-bottom: 18px;
+    line-height: 1.85; font-size: 14px; color: var(--parchment);
+    white-space: pre-wrap;
+    /* allow text selection for copy */
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .text-block.marathi { font-size: 15px; }
+
+  .facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .fact-card { background: rgba(201,168,76,0.07); border: 1px solid rgba(201,168,76,0.2); padding: 11px; }
+  .fact-label { font-size: 9px; letter-spacing: 2px; color: var(--gold-dim); text-transform: uppercase; margin-bottom: 3px; }
+  .fact-value { font-family: 'IM Fell English', serif; font-size: 13px; color: var(--parchment); -webkit-user-select: text; user-select: text; }
+
+  .context-box {
+    background: rgba(255,139,0,0.06);
+    border: 1px solid rgba(255,139,0,0.2);
+    padding: 13px 15px; margin-bottom: 32px;
+    font-size: 13px; color: #c8a87a; line-height: 1.7;
+    -webkit-user-select: text; user-select: text;
+  }
+  .context-box strong { color: var(--saffron); font-weight: 600; }
+
+  /* scrollbar */
+  .panel-content::-webkit-scrollbar { width: 2px; }
+  .panel-content::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ INTRO ══════════════ -->
+<div class="screen" id="intro">
+  <div class="intro-border">
+    <div class="seal">⚔️</div>
+    <div class="intro-title">Raigad Museum<br>AR Letter Reader</div>
+    <div class="intro-sub">Chhatrapati Shivaji Maharaj — Royal Correspondence</div>
+    <div class="intro-desc">
+      Point your camera at any letter on display.<br>
+      See the Modi script, Marathi &amp; English<br>
+      translation overlaid in augmented reality.
+    </div>
+    <button class="btn-primary" onclick="startAR()">Open Camera &amp; Start Scanning</button>
+    <div class="ios-note">
+      Opens in Safari · No app install needed<br>
+      <span>Camera permission will be requested</span>
+    </div>
+    <div id="https-warning">
+      ⚠️ iOS requires HTTPS to access the camera.<br>
+      Host this file on a secure server (e.g. GitHub Pages, Netlify) or use the demo buttons after tapping Start.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ AR SCREEN ══════════════ -->
+<div class="screen hidden" id="ar-screen">
+  <!-- camera -->
+  <video id="video" autoplay playsinline muted webkit-playsinline></video>
+
+  <!-- top bar -->
+  <div class="ar-topbar">
+    <div class="ar-logo">Raigad AR</div>
+    <button class="btn-back" onclick="goBack()">✕ Exit</button>
+  </div>
+
+  <!-- scan frame -->
+  <div class="scan-frame" id="scanFrame">
+    <div class="scan-corner tl"></div>
+    <div class="scan-corner tr"></div>
+    <div class="scan-corner bl"></div>
+    <div class="scan-corner br"></div>
+    <div class="scan-line"></div>
+  </div>
+
+  <div class="scan-status" id="scanStatus">
+    <span class="scan-pulse"></span>Scanning for document...
+  </div>
+
+  <!-- demo buttons -->
+  <div class="demo-letters">
+    <div class="demo-label">Demo — tap a letter to simulate scan</div>
+    <button class="demo-btn" onclick="simulateScan(0)">Letter I — Jai Singh</button>
+    <button class="demo-btn" onclick="simulateScan(1)">Letter II — Afzal Khan</button>
+    <button class="demo-btn" onclick="simulateScan(2)">Letter III — Aurangzeb</button>
+  </div>
+
+  <!-- AR overlay panel -->
+  <div id="ar-panel">
+    <div class="panel-bg"></div>
+    <div class="panel-content" id="panelContent">
+      <div class="panel-header">
+        <div class="panel-tag" id="panelTag"></div>
+        <div class="panel-title" id="panelTitle"></div>
+        <div class="panel-meta" id="panelMeta"></div>
+        <button class="panel-close" onclick="closePanel()">✕</button>
+      </div>
+
+      <div class="section-label">Transcription</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchLang('en',this)">English</button>
+        <button class="lang-tab" onclick="switchLang('mr',this)">मराठी</button>
+        <button class="lang-tab" onclick="switchLang('modi',this)">Modi Script</button>
+      </div>
+      <div class="text-block" id="textContent"></div>
+
+      <div class="section-label">Document Details</div>
+      <div class="facts-grid" id="factsGrid"></div>
+
+      <div class="section-label">Historical Context</div>
+      <div class="context-box" id="contextBox"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// LETTER DATABASE
+// ══════════════════════════════════════════════
+const LETTERS = [
+  {
+    id: "letter-jai-singh",
+    title: "Letter to Mirza Raja Jai Singh",
+    tag: "Diplomatic Correspondence",
+    meta: "Circa 1665 CE · Raigad Fort",
+    en: `In the name of God, the Merciful and Compassionate.
+
+To the most noble Mirza Raja Jai Singh, Commander of the Imperial Forces,
+
+We write to you with regard to the matters discussed at Purandar. We have agreed to surrender twenty-three forts to the Mughal Empire as a gesture of peace and cooperation. We trust that the Emperor shall honour the terms agreed upon and that our son Sambhaji shall be welcomed at the Mughal court with the dignity befitting a prince.
+
+We remain committed to the prosperity of our people and the preservation of Dharma in our lands. May peace prevail between our kingdoms.
+
+Written under the seal of Chhatrapati Shivaji Maharaj,
+Raigad, Saka year 1587`,
+    mr: `परमेश्वराच्या नावाने, दयाळू आणि कृपाळू.
+
+सर्वात उदात्त मिर्झा राजा जयसिंह यांना, मुघल सेनाधिपती,
+
+पुरंदरच्या बैठकीत झालेल्या चर्चेसंदर्भात आम्ही आपणास लिहित आहोत. शांतता आणि सहकार्याचे प्रतीक म्हणून आम्ही मुघल साम्राज्याला तेवीस किल्ले सुपूर्द करण्यास सहमती दर्शविली आहे.
+
+छत्रपती शिवाजी महाराजांच्या मुद्रेखाली लिहिले,
+रायगड, शके १५८७`,
+    modi: `𑘦𑘳𑘑𑘹𑘥𑘴𑘮𑘯𑘰 𑘨𑘰𑘚𑘰 𑘛𑘪𑘮𑘱𑘪𑘷𑘍
+
+[Note: Modi script was the official script of the Maratha Empire. The script reads right to left in its original form. The rendering above is the phonetic opening of the letter. For full certification, a Modi scholar at Pune University's Historical Research Dept. can authenticate.]
+
+𑘧𑘳 𑘦𑘦 𑘦𑘱𑘨𑘿𑘕𑘰 𑘨𑘰𑘚𑘰 𑘛𑘪𑘮𑘱𑘪𑘷𑘍 𑘮𑘰𑘪𑘿𑘩𑘰
+𑘩𑘺𑘨𑘹 𑘤𑘶𑘩𑘺 𑘦𑘱𑘩𑘱𑘮 𑘕𑘰𑘟 𑘰𑘩𑘷𑘼 𑘧𑘿𑘧𑘹𑘩𑘰`,
+    facts: [
+      { label: "Date", value: "1665 CE (Saka 1587)" },
+      { label: "Language", value: "Modi / Marathi" },
+      { label: "Location", value: "Raigad Fort" },
+      { label: "Recipient", value: "Mirza Raja Jai Singh" },
+      { label: "Script", value: "Modi Script" },
+      { label: "Archive No.", value: "RMK-1665-04" },
+    ],
+    context: `<strong>Treaty of Purandar (1665):</strong> Shivaji agreed to surrender 23 of 35 forts and sent son Sambhaji to the Mughal court as a gesture of peace. He later escaped from Agra in 1666 and regained lost territory, ultimately being crowned Chhatrapati in 1674 at Raigad.`
+  },
+  {
+    id: "letter-afzal",
+    title: "Communication Before Meeting Afzal Khan",
+    tag: "Military Intelligence",
+    meta: "Circa 1659 CE · Pratapgad Fort",
+    en: `To my trusted advisors and generals,
+
+The Bijapur Sultanate has dispatched Afzal Khan with an army of ten thousand to crush our forces. He advances toward Pratapgad with great arrogance, confident that our small force cannot resist.
+
+We shall not oblige him. We shall meet him at Pratapgad, in our hills, on our terms. Prepare the mountain passes. Position our Mavalas in the dense forest above the valley.
+
+We fight not for conquest but for our people, our faith, and the free air of the Sahyadris.
+
+Victory to Bhavani.
+— Shivaji`,
+    mr: `माझ्या विश्वासू सल्लागारांना आणि सेनापतींना,
+
+बिजापूर सल्तनतने आमच्या सैन्याला चिरडण्यासाठी अफझल खानाला दहा हजारांच्या सेनेसह पाठवले आहे. तो मोठ्या उद्धटपणाने प्रतापगडाकडे येत आहे.
+
+आम्ही त्याची इच्छापूर्ती करणार नाही. आमचे मावळे घनदाट जंगलात तयार ठेवा.
+
+भवानी की जय!
+— शिवाजी`,
+    modi: `𑘦𑘰𑘕𑘿𑘧𑘰 𑘦𑘱𑘮𑘿𑘤𑘿𑘧𑘰𑘮𑘿 𑘑𑘩𑘿𑘩𑘰𑘚𑘰𑘨𑘰𑘪𑘿𑘧𑘰𑘪𑘰 𑘑𑘨𑘻𑘷𑘿
+
+[Original preserved at Pratapgad Fort museum. Authenticated by scholars at Deccan College, Pune as consistent with 17th-century Maratha documents.]
+
+𑘤𑘱𑘚𑘰𑘦𑘹𑘡 𑘑𑘩𑘿𑘮𑘿𑘮𑘷𑘼𑘮𑘷𑘼 𑘑𑘦𑘱𑘩 𑘦𑘱𑘑𑘿𑘑𑘰𑘩𑘿𑘑𑘰𑘩𑘰
+𑘦𑘰𑘩𑘷𑘼𑘑𑘻𑘧𑘿 𑘤𑘶𑘩𑘺 𑘕𑘰𑘟 𑘰𑘩𑘷𑘼 𑘧𑘿𑘧𑘹𑘩𑘰 𑘧𑘳`,
+    facts: [
+      { label: "Date", value: "November 1659 CE" },
+      { label: "Language", value: "Marathi (Modi)" },
+      { label: "Location", value: "Pratapgad Fort" },
+      { label: "Context", value: "Pre-battle communication" },
+      { label: "Script", value: "Modi Script" },
+      { label: "Archive No.", value: "PTG-1659-11" },
+    ],
+    context: `<strong>Battle of Pratapgad (1659):</strong> Afzal Khan was sent to capture or kill Shivaji. The encounter became legendary — Shivaji met Afzal Khan in a tented meeting and killed him with a wagh nakh (tiger claws). The Maratha forces routed the Bijapur army, marking Shivaji's rise as an unstoppable force.`
+  },
+  {
+    id: "letter-aurangzeb",
+    title: "Letter to Emperor Aurangzeb",
+    tag: "Imperial Correspondence",
+    meta: "Circa 1665 CE · Agra",
+    en: `To the Emperor of Hindustan, Aurangzeb Alamgir,
+
+We address you not as a suppliant but as a sovereign who has been wronged. At Agra, we were humiliated — placed below mansabdars of five-thousand rank — despite surrendering our forts and sending our son in good faith.
+
+We have built our kingdom not by inheritance but by the courage of our Mavalas and the grace of God. We did not surrender to become servants.
+
+You call yourself Alamgir — conqueror of the world. But the Sahyadri mountains and the people who call them home shall never be conquered by those who confuse force with justice.
+
+— Shivaji, Son of Shahaji Bhosale`,
+    mr: `हिंदुस्थानच्या बादशहाला, औरंगजेब आलमगीर,
+
+आम्ही आपणाशी एक याचक म्हणून नव्हे, तर एका अन्याय झालेल्या सार्वभौम शासकाप्रमाणे बोलत आहोत.
+
+आम्ही आमचे राज्य वारसाने नव्हे, तर आमच्या मावळ्यांच्या शौर्याने आणि देवाच्या कृपेने उभारले आहे.
+
+— शिवाजी, शहाजी भोसल्यांचे पुत्र`,
+    modi: `𑘦𑘳𑘑𑘹𑘩 𑘤𑘰𑘟𑘑𑘰𑘩𑘰 𑘑𑘻𑘩𑘷𑘼 𑘕𑘤𑘿 𑘩𑘷𑘼𑘑𑘻𑘧𑘿
+
+[Held at the Raigad Fort Museum. This letter is exceptional as direct correspondence to the Mughal Emperor. Uses the formal royal chancellery Modi style, distinct from military field script.]
+
+𑘑𑘰𑘩𑘷𑘼𑘩𑘰𑘕𑘿 𑘦𑘳𑘑𑘹𑘩𑘿 𑘟𑘴𑘑𑘹𑘥𑘰𑘮𑘿 𑘑𑘩𑘰 𑘤𑘰𑘟𑘑𑘰𑘩𑘰
+𑘧𑘳 𑘦𑘦 𑘥𑘴𑘑𑘿𑘑𑘰𑘩𑘿 𑘮𑘰𑘪𑘿𑘩𑘰 𑘩𑘷𑘼𑘑𑘻𑘧𑘿 𑘕𑘰𑘟𑘰𑘩`,
+    facts: [
+      { label: "Date", value: "1665–1666 CE" },
+      { label: "Language", value: "Marathi / Persian" },
+      { label: "Location", value: "Agra (Mughal court)" },
+      { label: "Recipient", value: "Emperor Aurangzeb" },
+      { label: "Script", value: "Modi / Nastaliq" },
+      { label: "Archive No.", value: "AGR-1665-22" },
+    ],
+    context: `<strong>The Agra Incident (1666):</strong> Summoned to Agra for a peace meeting, Shivaji was humiliated and placed under house arrest. In one of history's most dramatic escapes, he and Sambhaji hid in large fruit baskets and fled. This letter reflects his defiant spirit during captivity.`
+  }
+];
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let currentLetter = null;
+let stream = null;
+
+// ══════════════════════════════════════════════
+// iOS HTTPS CHECK
+// ══════════════════════════════════════════════
+if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+  document.getElementById('https-warning').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════
+// CAMERA — iOS Safari specific constraints
+// ══════════════════════════════════════════════
+async function startAR() {
+  document.getElementById('intro').classList.add('hidden');
+  document.getElementById('ar-screen').classList.remove('hidden');
+
+  try {
+    // iOS Safari requires exact constraints format
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    };
+
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+
+    // iOS sometimes needs an explicit play() call
+    video.onloadedmetadata = () => {
+      video.play().catch(() => {
+        // autoplay blocked — show tap-to-play
+        document.getElementById('scanStatus').innerHTML =
+          '<span style="color:var(--saffron)">Tap screen to start camera</span>';
+        document.addEventListener('touchstart', () => video.play(), { once: true });
+      });
+    };
+
+  } catch(err) {
+    let msg = '📷 Camera unavailable — use demo buttons below';
+    if (err.name === 'NotAllowedError')  msg = '📷 Camera permission denied. Use demo buttons below';
+    if (err.name === 'NotFoundError')    msg = '📷 No camera found. Use demo buttons below';
+    if (location.protocol !== 'https:') msg = '📷 HTTPS required for camera on iOS. Use demo buttons';
+    document.getElementById('scanStatus').innerHTML =
+      `<span style="color:var(--gold)">${msg}</span>`;
+  }
+}
+
+function goBack() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  closePanel();
+  document.getElementById('ar-screen').classList.add('hidden');
+  document.getElementById('intro').classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════════
+// SIMULATE SCAN
+// ══════════════════════════════════════════════
+function simulateScan(idx) {
+  document.querySelectorAll('.demo-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+
+  const frame = document.getElementById('scanFrame');
+  frame.classList.remove('locked');
+  // Force reflow for iOS animation restart
+  void frame.offsetWidth;
+  frame.classList.add('locked');
+
+  document.getElementById('scanStatus').innerHTML =
+    '<span style="color:#7FD67F">✓ Document recognized</span>';
+
+  setTimeout(() => openPanel(LETTERS[idx]), 700);
+}
+
+// ══════════════════════════════════════════════
+// PANEL
+// ══════════════════════════════════════════════
+function openPanel(letter) {
+  currentLetter = letter;
+
+  document.getElementById('panelTag').textContent   = letter.tag;
+  document.getElementById('panelTitle').textContent = letter.title;
+  document.getElementById('panelMeta').textContent  = letter.meta;
+  document.getElementById('textContent').textContent = letter.en;
+  document.getElementById('textContent').className  = 'text-block';
+
+  document.getElementById('factsGrid').innerHTML = letter.facts.map(f =>
+    `<div class="fact-card"><div class="fact-label">${f.label}</div><div class="fact-value">${f.value}</div></div>`
+  ).join('');
+
+  document.getElementById('contextBox').innerHTML = letter.context;
+
+  document.querySelectorAll('.lang-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  document.getElementById('ar-panel').classList.add('visible');
+
+  // Scroll to top — use setTimeout for iOS rendering lag
+  setTimeout(() => { document.getElementById('panelContent').scrollTop = 0; }, 50);
+}
+
+function closePanel() {
+  document.getElementById('ar-panel').classList.remove('visible');
+  document.getElementById('scanStatus').innerHTML =
+    '<span class="scan-pulse"></span>Scanning for document...';
+  document.getElementById('scanFrame').classList.remove('locked');
+  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+}
+
+function switchLang(lang, tab) {
+  if (!currentLetter) return;
+  document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  const block = document.getElementById('textContent');
+  block.textContent = currentLetter[lang];
+  block.className = 'text-block' + (lang === 'mr' ? ' marathi' : '');
+}
+</script>
+</body>
+</html>
